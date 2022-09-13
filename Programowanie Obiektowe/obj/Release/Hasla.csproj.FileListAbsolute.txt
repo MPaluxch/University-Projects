@@ -1,0 +1,12 @@
+C:\Users\macie\source\repos\Hasla\Hasla\bin\Release\Hasla.exe.config
+C:\Users\macie\source\repos\Hasla\Hasla\bin\Release\Hasla.exe
+C:\Users\macie\source\repos\Hasla\Hasla\bin\Release\Hasla.pdb
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.csproj.AssemblyReference.cache
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.csproj.SuggestedBindingRedirects.cache
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.Form1.resources
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.Form2.resources
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.Properties.Resources.resources
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.csproj.GenerateResource.cache
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.csproj.CoreCompileInputs.cache
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.exe
+C:\Users\macie\source\repos\Hasla\Hasla\obj\Release\Hasla.pdb
