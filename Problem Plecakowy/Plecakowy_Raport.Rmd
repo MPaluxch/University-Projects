@@ -1,0 +1,412 @@
+---
+title: "Problem Plecakowy - implementacja w R"
+author: "Maciej Paluch"
+date: "05.05.2021"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+<style>
+body {
+text-align: justify}
+}
+
+</style>
+
+```{r, echo =FALSE, results=FALSE, message=FALSE, warning=FALSE}
+library(ggpubr)
+library(ggthemes)
+library(ggrepel)
+library(DT)
+library(plotly)
+```
+
+## Wstęp  
+
+**Problem Plecakowy** (ang. Knapsack Problem) jest jednym z najbardziej 
+znanych problemów optymalizacyjnych. Nazwa tego problemu pochodzi od 
+plecaka, do którego wpakowuje się przedmioty (o znanych parametrach takich 
+jak waga (masa), a także wartość (np. cena przedmiotu)),   
+w taki sposób, aby wartość sumaryczna wszystkich wpakowanych przedmiotów była jak 
+największa. Plecak ma oczywiście swoją ładowność, której sumaryczna waga 
+wpakowywanych przedmiotów nie może przekroczyć.  
+
+Problem też często jest nazywany problemem złodzieja. Wyobraźmy sobie 
+zamaskowanego człowieka, który wchodzi z torbą do sklepu i chce sobie „szybko 
+dorobić”. Zna wszystkie wartości przedmiotów na wystawie i musi zaplanować 
+w jaki sposób pakować, aby wynieść przedmioty o jak największej wartości, 
+ale pamiętając, że torba/plecak ma swoją maksymalną ładowność i kiedy ją 
+przekroczy torba np. pęknie.  
+
+Dlatego celem złodzieja jest wyniesienie takich przedmiotów, które są 
+najbardziej opłacalne pod względem sumarycznej wartości, ale uważając  
+i nieprzekraczając dostępnej ładowności plecaka.
+
+Problem plecakowy możemy rozwiązać za pomocą pewnych algorytmów:  
+
+* Algorytmy zachłanne
+    + Największe Wartości
+    + Najlżejsze
+    + Jednostkowe (Wartość / Waga)
+* Algorytm optymalny  
+  
+    
+      
+***      
+
+
+
+Wygenerujmy 70 obiektów na których będziemy przeprowadzać operacje algorytmiczne:
+
+```{r, echo= T}
+## Dane wstepne ----
+## Generowanie losowych param. czasu (wagi)
+time_attack <- round(abs((rnorm(70)*50))+1,0)
+
+time_attack
+## Generowanie losowych param. czasu (wagi)
+value <- round(abs(time_attack*rnorm(35)*10)+1,0)
+
+## Tablica z wartoscia i "waga"
+data_frame <- data.frame(value,time_attack)
+
+## Generowanie nazw przedmiotow 
+name_attack <- c()
+
+for (i in 1:nrow(data_frame)){
+  
+  if (data_frame$time_attack[i] <= 15){
+  name_attack[i] <- paste0("Wioska_",i)
+  }
+  
+  else if (data_frame$time_attack[i] > 15  &  data_frame$time_attack[i] <= 60) {
+    name_attack[i] <- paste0("Magazyn_",i)
+  }
+  
+  else {
+    name_attack[i] <- paste0("Twierdza_",i)
+  }
+}
+
+## Ostateczna wersja tablicy z danymi
+data_frame <- cbind(data_frame,name_attack)
+data_frame <- data_frame[c(3,1,2)]
+
+data_frame$name_attack <- as.character(data_frame$name_attack)
+```
+
+Sprawdźmy teraz naszą gotową ramkę danych:
+
+```{r}
+datatable(data_frame)
+```
+
+***  
+
+## Korelacja  
+  
+Sprawdźmy jaka jest korelacja pomiędzy wartością obiektu, a czasem ataku (chcemy uniknąć trywialności zadania)  
+  
+    
+      
+      
+```{r, echo=T, message=FALSE}
+ggscatter(na.omit(data_frame), y = "value", x = "time_attack",
+          color = "black", size = 3.75, shape = 1,
+          add = "reg.line", xlab = "Czas ataku [s] ", ylab="Wartość",
+          cor.method = "pearson",
+          add.params = list(color = "red", fill = "grey", size=2.4),
+          conf.int = TRUE, cor.coef = TRUE, 
+          cor.coeff.args = list(method = "pearson", color="red", size=4.65, label.x=5, label.sep = "\n")) +
+  theme_minimal() +
+  #theme(panel.background = element_rect(fill="#330066")) +
+  theme(plot.title = element_text(size= 16, colour= "black")) +
+  theme(axis.title.x = element_text(size = 15)) +
+  theme(axis.title.y = element_text(size = 15)) +
+  labs(title = "Korelacja", subtitle = "Pomiędzy wartością obiektu, a czasem potrzebnym na jego zniszczenie")
+
+```
+
+***  
+
+## Algorytmy zachłanne  
+### Algorytm pierwszy (bierzemy pod uwagę tylko wartość)
+
+```{r, echo=T}
+## a) Najwartosciowsze ----
+
+## Sortujemy po wartosci najcenniejszej 
+value_function <- function(seconds){
+  sort_val <- data_frame[order(-data_frame$value),]
+
+  ## Obliczenie sumy sekund
+  sum_time <- 0
+  for (i in 1:nrow(sort_val)){
+    sum_time <- sum_time + sort_val$time_attack[i]
+    if (seconds <= sort_val$time_attack[1]) {
+      return(0)
+    }
+    else if (sum_time >= seconds){
+      sum_time <- sum_time - sort_val$time_attack[i]
+      value_table <<- sort_val[(1:(i-1)),]
+      break
+    }
+  }
+
+print(ggplot(value_table, aes(cumsum(time_attack), cumsum(value))) + 
+        geom_step(aes(x= cumsum(time_attack), y = cumsum(value)), color="black") +
+        geom_point(aes(x= cumsum(time_attack), y = cumsum(value)), size=4) +
+        geom_point(aes(x=0,y=0),size= 4) +
+        geom_segment(aes(x = 0, y = 0, xend = time_attack[1], yend = 0)) +
+        geom_segment(aes(x = time_attack[1], y = 0, xend = time_attack[1], yend = value[1])) +
+        geom_label_repel(aes(label=name_attack), size = 4) +
+        labs(title= "Algorytm Zachłanny\n(Najwartościowsze)", 
+             x="Skumulowany czas [s]", y= "Skumulowana wartość") +
+        theme_light())
+  
+return(cat(paste0("Optymalnie mozna wybrac: ", "\n",
+                              paste0(as.vector(value_table$name_attack), collapse = ", "), ",",
+                               "\n","gdzie laczna wartosc to: ", sum(value_table$value),
+                               "\n","a potrzebny czas to: ", sum_time, "s\n\n")))
+  
+}
+```
+
+Wykorzystajmy teraz naszą funkcję dla algorytmu zachłannego pierwszego - jako argument podajemy maksymalny czas ataku ("ładowność plecaka") 
+
+```{r}
+value_function(300) #Algorytm zachlanny (najwartosciowsze)
+```
+```{r, echo=FALSE}
+datatable(value_table)
+```
+
+***  
+
+### Algorytm ten drugi ("Najlżejszy")
+
+```{r, echo = T}
+#b) Najmniej czasochlonne ----
+time_function <- function(seconds){
+sort_time <- data_frame[order(data_frame$time_attack),]
+
+sum_time <- 0
+for (i in 1:nrow(sort_time)){
+  sum_time <- sum_time + sort_time$time_attack[i]
+  if (seconds <= sort_time$time_attack[1]) {
+    return(0)
+  }
+  else if (sum_time >= seconds){
+    sum_time <- sum_time - sort_time$time_attack[i]
+    time_table <<- sort_time[(1:(i-1)),]
+    break
+  }
+}
+
+print(ggplot(time_table, aes(cumsum(time_attack), cumsum(value))) + 
+        geom_step(aes(x= cumsum(time_attack), y = cumsum(value)), color="black") +
+        geom_point(aes(x= cumsum(time_attack), y = cumsum(value)), size=4) +
+        geom_point(aes(x=0,y=0),size= 4) +
+        geom_segment(aes(x = 0, y = 0, xend = time_attack[1], yend = 0)) +
+        geom_segment(aes(x = time_attack[1], y = 0, xend = time_attack[1], yend = value[1])) +
+        geom_label_repel(aes(label=name_attack), size = 4) +
+        labs(title= "Algorytm Zachłanny\n(Najmniej czasochłonne)", 
+             x="Skumulowany czas [s]", y= "Skumulowana wartość") +
+        theme_light())
+
+
+
+return(cat(paste0("Optymalnie mozna wybrac: ", "\n",
+                            paste0(as.vector(time_table$name_attack), collapse = ", "), ",",
+                            "\n","gdzie laczna wartosc to: ", sum(time_table$value),
+                            "\n","a potrzebny czas to: ", sum_time, "s\n\n")))
+
+}
+```
+
+Wykorzystajmy teraz naszą funkcję dla algorytmu zachłannego drugiego - jako argument podajemy maksymalny czas ataku ("ładowność plecaka") 
+
+```{r}
+time_function(300) #Algorytm zachlanny ("najlzejsze")
+```
+```{r, echo=FALSE}
+datatable(time_table)
+```
+
+***  
+
+### Algorytm zachłanny trzeci (jednostkowy):
+
+```{r, echo = T}
+##c) Jednostkowe----
+unit_function <- function(seconds){
+
+## Tablica z podzielona wartoscia na 1 sekunde ataku
+sort_unit <- data_frame[order(-data_frame$value),]
+unit_sec <- round(c(sort_unit$value/sort_unit$time_attack),3)
+sort_unit <- cbind(sort_unit, unit_sec)
+sort_unit <- sort_unit[order(-sort_unit$unit_sec),]
+
+sum_time <- 0
+for (i in 1:nrow(sort_unit)){
+  sum_time <- sum_time + sort_unit$time_attack[i]
+  if (seconds <= sort_unit$time_attack[1]) {
+    return(0)
+  }
+  else if (sum_time >= seconds){
+    sum_time <- sum_time - sort_unit$time_attack[i]
+    unit_table <<- sort_unit[(1:(i-1)),]
+    break
+  }
+}
+
+print(ggplot(unit_table, aes(cumsum(time_attack), cumsum(value))) + 
+        geom_step(aes(x= cumsum(time_attack), y = cumsum(value)), color="black") +
+        geom_point(aes(x= cumsum(time_attack), y = cumsum(value)), size=4) +
+        geom_point(aes(x=0,y=0),size= 4) +
+        geom_segment(aes(x = 0, y = 0, xend = time_attack[1], yend = 0)) +
+        geom_segment(aes(x = time_attack[1], y = 0, xend = time_attack[1], yend = value[1])) +
+        geom_label_repel(aes(label=name_attack), size = 4) +
+        labs(title= "Algorytm Zachłanny\n(Wartość/Waga) ", 
+             x="Skumulowany czas [s]", y= "Skumulowana wartość") +
+        theme_light())
+
+return(cat(paste0("Optymalnie mozna wybrac: ", "\n",
+                         paste0(as.vector(unit_table$name_attack), collapse = ", "), ",",
+                         "\n","gdzie laczna wartosc to: ", sum(unit_table$value), 
+                         "\n","a potrzebny czas to: ", sum_time, "s\n\n")))
+
+}
+
+```
+
+Wykorzystajmy teraz naszą funkcję dla algorytmu zachłannego trzeciego - jako argument podajemy maksymalny czas ataku ("ładowność plecaka") 
+
+```{r}
+unit_function(300)#Algorytm zachlanny (wartosc/waga)
+```
+```{r, echo=FALSE}
+datatable(unit_table)
+```
+
+***  
+
+## Algorytm optymalny
+
+```{r, echo = T}
+##2) Algorytm optymalny ----
+optim_function <- function(w, p, cap) {
+  n <- length(w)
+  
+  # macierze
+  x <- logical(n)
+  Fr <- matrix(0, nrow = cap + 1, ncol = n)
+  G <- matrix(0, nrow = cap + 1, ncol = 1)
+  
+  # uzupelnienie macierzy wartosciami
+  for (k in 1:n) {
+    Fr[, k] <- G
+    H <- c(numeric(w[k]), G[1:(cap + 1 - w[k]), 1] + p[k])
+    G <- pmax(G, H)
+  }
+  fmax <- G[cap + 1, 1]
+  
+  # wyszukiwanie nazw
+  f <- fmax
+  j <- cap + 1
+  for (k in n:1) {
+    if (Fr[j, k] < f) {
+      x[k] <- TRUE
+      j <- j - w[k]
+      f <- Fr[j, k]
+    }
+  }
+  
+  inds <- which(x)
+  wght <- sum(w[inds])
+  prof <- sum(p[inds])
+  names_list <- c()
+  v <- as.vector(inds)
+  v_leng <- as.numeric(length(v))
+  
+  for (i in 1:v_leng){
+    names_list[i] <- (data_frame[v[i],1])
+    knap_table <<- data_frame[v,]
+  }
+  
+print(ggplot(knap_table, aes(cumsum(time_attack), cumsum(value))) + 
+  geom_step(aes(x= cumsum(time_attack), y = cumsum(value)), color="black") +
+  geom_point(aes(x= cumsum(time_attack), y = cumsum(value)), size=5) +
+  geom_point(aes(x=0,y=0),size= 5) +
+  geom_segment(aes(x = 0, y = 0, xend = time_attack[1], yend = 0)) +
+  geom_segment(aes(x = time_attack[1], y = 0, xend = time_attack[1], yend = value[1])) +
+  geom_label_repel(aes(label=name_attack), size = 4) +
+  labs(title= "Algorytm Optymalny", x="Skumulowany czas [s]", y= "Skumulowana wartość") + 
+  theme_light())
+
+return(cat(paste0(" Optymalnie mozna wybrac: ", "\n",
+                           paste0(as.vector(names_list), collapse = ", "), ",",
+                           "\n\n","gdzie laczna wartosc to: ", prof,
+                           "\n","a potrzebny czas to: ", wght, "s\n\n")))
+
+}
+```
+
+Wykorzystajmy teraz naszą funkcję dla algorytmu optymalnego - w argumentach podajemy dwie interesujące nas zmienne, oraz maksymalny czas ataku ("ładowność plecaka") 
+
+```{r}
+optim_function(data_frame$time_attack, data_frame$value, 300) #Algorytm optymalny
+```
+```{r, echo=FALSE}
+datatable(knap_table)
+```
+
+```{r, echo=T}
+##3) Wykres porownujacy ----
+all_plot_function <- function(){
+print(ggplot() + 
+  geom_step(data=time_table,aes(x=cumsum(time_attack), y=cumsum(value)), color="black") +
+  geom_point(data=time_table,aes(x=cumsum(time_attack), y=cumsum(value)), size=2, color="black") +
+  geom_point(data=time_table, aes(x=0,y=0, colour="black"),size=2) +
+  geom_segment(data=time_table, aes(x=0, y=0, xend=time_attack[1], yend=0), color="white") +
+  geom_segment(data=time_table, aes(x=time_attack[1], y=0, xend=time_attack[1], yend=value[1]),
+               color= "black") +
+  
+  geom_step(data=unit_table,aes(x=cumsum(time_attack), y=cumsum(value)), color="green") +
+  geom_point(data=unit_table,aes(x=cumsum(time_attack), y=cumsum(value)), size=2, color="green") +
+  geom_point(data=unit_table, aes(x=0,y=0, colour="green"),size=2) +
+  geom_segment(data=unit_table, aes(x=0, y=0, xend=time_attack[1], yend=0), color="green") +
+  geom_segment(data=unit_table, aes(x=time_attack[1], y=0, xend=time_attack[1], yend=value[1]),
+               color= "green") +
+  
+  geom_step(data=value_table,aes(x=cumsum(time_attack), y=cumsum(value)), color="royalblue2") +
+  geom_point(data=value_table,aes(x=cumsum(time_attack), y=cumsum(value)), size=2, color="royalblue2") +
+  geom_point(data=value_table, aes(x=0,y=0, colour="royalblue2"),size=2) +
+  geom_segment(data=value_table, aes(x=0, y=0, xend=time_attack[1], yend=0), color="royalblue2") +
+  geom_segment(data=value_table, aes(x=time_attack[1], y=0, xend=time_attack[1], yend=value[1]), 
+               color= "royalblue2") +
+  
+  geom_step(data=knap_table,aes(x=cumsum(time_attack), y=cumsum(value)), color="red") +
+  geom_point(data=knap_table,aes(x=cumsum(time_attack), y=cumsum(value)), size=2, color="red") +
+  geom_point(data=knap_table, aes(x=0,y=0, colour="red"),size=2) +
+  geom_segment(data=knap_table, aes(x=0, y=0, xend=time_attack[1], yend=0), color="red") +
+  geom_segment(data=knap_table, aes(x=time_attack[1], y=0, xend=time_attack[1], yend=value[1]),
+               color="red") +
+  
+  geom_point(data=knap_table, aes(x=0,y=0),size=3.5, shape=8) +
+  
+  scale_color_manual(labels=c("Najlżejszy", "Wartość", "Wartość / Waga", "Optymalny"), 
+                     values = c("black", "royalblue2", "green", "red")) +
+  labs(title= "Porównanie Algorytmów", x= "Skumulowany czas [s]", y= "Skumulowana wartość",
+       color= "Algorytm: ") + 
+  theme_light())
+}
+```
+
+Wykorzystajmy funkcję do wygenerowania porównującego wykresu (nie musimy podawać żadnych argumentów) 
+
+```{r}
+all_plot_function()
+```
