@@ -1,0 +1,734 @@
+---
+title: "Szeregi Czasowe"
+author: "Maciej Paluch"
+date: "11.06.2021"
+output: 
+  html_document: default
+  pdf_document: default
+  word_document: default
+always_allow_html: true
+---
+<style>
+body {
+text-align: justify}
+}
+
+</style>
+
+```{r, echo= F, results= F, message=F, warning=F}
+library(tsbox)
+library(TSstudio)
+library(forecast)
+library(rmarkdown)
+
+setwd("C:/Users/macie/Desktop/Dokumenty")
+
+## I. Wczytanie danych ####
+## 1) Dane 1
+## 2) Dane 2 
+dane1 <- read.csv2("Poland2.csv", sep=",", header = T)
+dane2 <- read.csv2("owoce.csv", sep=",", header = T)
+colnames(dane1) <- c("Data", "Wartosc")
+colnames(dane2) <- c("Data", "Cena_[tona]")
+
+dane1$Wartosc <- round(as.numeric(dane1$Wartosc),1)
+dane2$`Cena_[tona]` <- round(as.numeric(dane2$`Cena_[tona]`),1)
+
+## Ograniczenie danych ####
+## 1) Dane1 ----
+dane1 <- ts(dane1$Wartosc, start=c(2010,1), frequency = 12)
+dane1 <- window(dane1, start = c(2010,1), end = c(2020,12))
+
+## 2) Dane2 ----
+dane2 <- ts(dane2$`Cena_[tona]`, start=c(2000,1), frequency = 12)
+dane2 <- window(dane2, start = c(2000,1), end = c(2020,12))
+```
+
+
+## Opis użytych szeregów czasowych
+
+Zharmonizowane wskaźniki cen konsumpcyjnych (HICP) mierzą zmiany w czasie cen towarów 
+i usług konsumpcyjnych w danym kraju. Dają one porównywalną miarę inflacji, ponieważ są 
+obliczane zgodnie ze zharmonizowanymi definicjami.
+
+**Szereg 1 -  Zharmonizowany wskaźnik cen konsumpcyjnych: Pakiety wakacyjne dla Polski**  
+Kategoria ta jest klasyfikacją usług, która obejmuje cenę wakacji (lub wycieczek wliczonych w cenę) na terenie Polski w latach 2010-2020.  
+Dzięki przeprowadzonej analizie można dowiedzieć się ciekawych rzeczy, typu w których miesiącach 
+ceny najbardziej wzrastają, czy ciągle rosną w górę, oraz prognozować kolejne lata i sprawdzić, 
+czy zaobserwowany trend się utrzyma.  
+[Harmonized Index of Consumer Prices: Package Holidays for Poland](https://fred.stlouisfed.org/series/CP0960PLM086NEST)
+
+**Szereg 2 - Indeks cen konsumpcyjnych dla wszystkich konsumentów miejskich:** 
+ **Owoce i Warzywa w USA Średnia Miejska**  
+Kategoria ta jest klasyfikacją wskaźnika inflacji cen na rynku owoców i warzyw w Stanach 
+Zjednoczonych w latach 2000-2020.  
+Dzięki przeprowadzonej analizie można dowiedzieć się ciekawych rzeczy, o których być może nigdy 
+wcześniej nie myśleliśmy, czyli jak zmieniają się ceny owoców i warzyw w miastach u Jankesów. 
+Po przeanalizowaniu szeregu można zobaczyć, czy jest tutaj widoczny trend i czy utrzyma się on 
+w nadchodzących latach.  
+[Consumer Price Index for All Urban Consumers: Fruits and Vegetables in U.S. City Average](https://fred.stlouisfed.org/series/CUSR0000SAF113)
+
+
+
+***
+
+Dane wyglądają następująco:  
+  
+  **Szereg 1:**
+  
+```{r, echo=FALSE}
+dane1
+```
+
+  **Szereg 2:**
+  
+```{r, echo=F}
+dane2
+```
+
+***  
+
+***
+
+## Wykresy 
+
+**1) Wykresy podstawowe**  
+
+a) Wykres podstawowy dla **Szeregu 1 - trend + sezonowość**
+
+```{r, echo=F}
+## 1) Dane1 
+plot(dane1, main="Zharmonizowany Indeks Cen Konsumpcyjnych:
+Pakiety wypoczynkowe dla Polski")
+```
+
+b) Wykres podstawowy dla **Szeregu 2  - tylko trend**
+
+```{r, echo=F}
+plot(dane2, main="Wskaznik cen konsumpcyjnych (owoce, warzywa) w USA")
+```
+
+**2) Wykresy przedstawiające sezonowość**
+
+**a) Szereg 1**
+
+```{r, echo=F}
+ts_seasonal(dane1, type="box")
+seasonplot(dane1, col = rainbow(12), year.labels = TRUE, pch = 19,
+           main = "Wykres sezonowosci Dane1")
+monthplot(dane1, main= "Wykres miesieczny Dane1")
+```
+
+***Wniosek:*** Dla powyższych danych można zauważyć sezonowość. Widoczna jest ona w miesiącach lipiec - sierpień.  
+W wykresie boxplot widać, że mediany tych miesięcy są najwyższe. W drugim typie widać, że te dwa miesiące są najwyższej 
+w porównaniu  
+z innymi miesiącami w danym roku. Rownież widać to po średnich - trzeci typ wykresu.
+
+
+**b) Szereg 2**
+
+```{r, echo=F}
+ts_seasonal(dane2, type="box")
+seasonplot(dane2, col = rainbow(12), year.labels = TRUE, pch = 19,
+           main = "Wykres sezonowosci Dane2")
+monthplot(dane2, main= "Wykres miesieczny Dane2")
+```
+
+***Wniosek:*** Dla powyższych danych nie można odnaleźć sezonowości - brak sezonowości w danych.
+
+
+**3) Wykres rozrzutu - lagplot**
+
+**a) Szereg 1**
+
+```{r, echo=F}
+lag.plot(dane1, lags= 12, do.lines = F,
+         main= "Wykres rozrzutu Dane1")
+```
+
+**b) Szereg 2**
+
+```{r, echo=F}
+lag.plot(dane2, lags= 12, do.lines = F,
+         main= "Wykres rozrzutu Dane2")
+```
+
+
+***
+
+***
+
+## Dekompozycja
+
+***1) Korelogramy ACF i PACF***
+
+**a) Szereg 1**
+
+```{r, echo=F}
+dane1PD <- decompose(dane1)
+plot(dane1PD)
+tsdisplay(dane1)
+```
+
+**b) Szereg 2**
+
+```{r, echo=F}
+dane2PD <- decompose(dane2)
+plot(dane2PD)
+tsdisplay(dane2)
+```
+
+***Wnioski:*** Dla Szeregu 1 widzimy sezonowość i trend dzięki wykresowi ACF - widoczna cykliczność i powoli opadające słupki.  
+Dla Szeregu 2 widzimy trend - dodanie i powoli opadające.
+
+* ACF 
+    + dodanie i powoli opadające - dane zawierają deterministyczną składową trendu
+    + zanikają powoli i są cykliczne - obecność sezonowości - trend sezonowy
+* PACF 
+    + duża wartość Lag 1 - obecność silnego trendu wzrostowego
+
+***
+
+***2) Dekompozycja - Średnia ruchoma***
+
+```{r, echo=F}
+dane1.6 <- filter(dane1, sides = 2, filter = rep(1/6,6))
+dane1.12 <- filter(dane1, sides = 2, filter = rep(1/12,12))
+plot(dane1, main = "Wygladzanie -  ruchoma srednia", lwd=1.6)
+lines(dane1.6, col = "red", lty = 5, lwd= 2.5)
+lines(dane1.12, col = "blue", lty = 4, lwd= 3)
+legend("topleft", legend=c("Dane1", "Dane1 (1/6,6)", "Dane1 (1/12,12)"), 
+       col= c("black", "red", "blue"), lty=c(1,2))
+```
+
+***UWAGA!*** Dekompozycja średniej ruchomej może być przeprowadzana w przypadku danych okresowych, lub takich gdzie podejrzewamy występowanie sezonowości.
+
+***Wniosek:*** 12msc średnia krocząca wskazuje na tendencję wzrostową (kolor niebieski)  
+6msc średnia krocząca wskazuje na istnienie składnika sezonowego (kolor czerwony)
+
+***
+
+***3) Dekompozycja na podstawie modelu regresji liniowej***
+
+a) Tylko trend liniowy
+
+```{r, echo=F}
+dane2Trend <- tslm(dane2 ~ trend) 
+sumTrend <- summary(dane2Trend)
+sumTrend$adj.r.squared
+plot(dane2, main="Model regresji liniowej")
+lines(fitted(dane2Trend), col="red", lty=2, lwd= 2.5)
+legend("topleft", legend=c("Dane2", "Model trendu"), col= c("black", "red"),
+       lty=c(1,2))
+```
+
+Reszty:
+
+```{r, echo=F}
+tsdisplay(residuals(dane2Trend), main="Reszty (trend liniowy)")
+```
+
+b) Trend + Sezonowość
+
+```{r, echo=F}
+dane2TrendS <- tslm(dane2 ~ trend + season)
+sumTrendS <- summary(dane2TrendS)
+sumTrendS$adj.r.squared
+plot(dane2, main="Model regresji liniowej: trend + sezonowosc")
+lines(fitted(dane2TrendS), col="blue", lty=2, lwd= 2.5)
+legend("topleft", legend=c("Dane2", "Model trendu"), col= c("black", "blue"),
+       lty=c(1,2))
+```
+
+Reszty:
+
+```{r, echo=F}
+tsdisplay(residuals(dane2TrendS), main="Reszty (trend + sezonowosc)")
+```
+
+c) Transformacja Boxa-Coxa
+
+```{r, echo=F}
+dane2TrendSLog <- tslm(dane2 ~ trend + season, lambda = 0)
+sumTrendSLog <- summary(dane2TrendSLog)
+sumTrendSLog$adj.r.squared
+plot(dane2, main="Model regresji liniowej po transormacji Boxa-Coxa")
+lines(fitted(dane2TrendSLog), col="green", lty=2, lwd= 2.5)
+legend("topleft", legend=c("Dane2", "Model trendu"), col= c("black", "green"),
+       lty=c(1,2))
+```
+
+Reszty:
+
+```{r, echo=F}
+tsdisplay(residuals(dane2TrendSLog), main="Reszty (transformacja Boxa-Coxa)")
+```
+
+d) Model wielowymiarowy
+
+```{r, echo=F}
+dane2TrendSLog2 <- tslm(dane2 ~ season + poly(trend, raw= T, degree = 2), lambda = 0)
+sumTrendSLog2 <- summary(dane2TrendSLog2)
+sumTrendSLog2$adj.r.squared
+plot(dane2, main="Model regresji kwadratowej po transormacji Boxa-Coxa")
+lines(fitted(dane2TrendSLog2), col="red", lty=2, lwd= 2.5)
+legend("topleft", legend=c("Dane2", "Model trendu"), col= c("black", "red"),
+       lty=c(1,2))
+```
+
+Reszty:
+
+```{r, echo=F}
+tsdisplay(residuals(dane2TrendSLog2), main="Reszty - Funkcja kwadratowa - (transformacja Boxa-Coxa)")
+```
+
+***Wnioski:*** Patrzymy na współczynnik R^2 każdego modelu i wybieramy ten, który jest najwyższy.  
+Najlepsze dopasowanie to **Model Wielowymiarowy**. (Wartość R^2 na początku każdego z modeli).
+
+***
+
+***
+
+## Eliminacja sezonowości
+
+```{r, echo=FALSE}
+dane1.multi <- decompose(dane1, "multiplicative")
+dane1.odsezonowane <- seasadj(dane1.multi)
+plot(dane1, main="Szereg oryginalny i odsezonowany")
+lines(dane1.odsezonowane, col="red", lty=2, lwd= 2.5)
+legend("topleft", legend=c("Dane oryginalne", "Dane odsezonowane"), col= c("black", "red"),
+       lty=c(1,2))
+```
+
+Poddany obróbce został Szereg 1 - zawierający sezonowość.  
+Na powyższym wykresie możemy odczytać jak zmienił się szereg po odsezonowaniu i porównać go z oryginalnym.
+
+***
+
+***
+
+## Stacjonarność
+
+***Uczynienie badanych szeregów stacjonarnymi ***
+
+**1) Dane 1**
+
+```{r, echo=F}
+tsdisplay(dane1)
+```
+
+Wykres Szeregu 1 wraz z korelogramami ACF i PACF
+
+```{r, echo=FALSE}
+dane1.log <- BoxCox(x=dane1, lambda=0)
+#tsdisplay(data_sL)
+
+dane1.log.diff <- diff(dane1.log, lag = 1)
+#tsdisplay(data_sLS)
+dane1.log.diff2 <- diff(dane1.log.diff, lag = 12)
+tsdisplay(dane1.log.diff2, lag.max=60)
+```
+
+Wykres Szeregu 1 już po uczynieniu go szeregiem stacjonarnym.  
+
+***Wniosek:*** Z wykresu ACF możemy odczytać, że jest to realizacja szumu białego.  
+(Ponad 95% rozmieszczenia słupków znajduje się w przedziale ufnośći)
+
+
+***
+
+**2) Dane 2**
+
+```{r, echo=F}
+tsdisplay(dane2)
+```
+
+Wykres Szeregu 2 wraz z korelogramami ACF i PACF
+
+```{r, echo=FALSE}
+dane2.log <- BoxCox(x=dane2, lambda=0)
+#tsdisplay(data_sL)
+
+dane2.log.diff <- diff(dane2.log, lag = 1)
+#tsdisplay(data_sLS)
+dane2.log.diff2 <- diff(dane2.log.diff, lag = 12)
+tsdisplay(dane2.log.diff2, lag.max=60)
+```
+
+Wykres Szeregu 2 już po uczynieniu go szeregiem stacjonarnym.  
+
+***Wnioski:*** Z wykresu ACF możemy odczytać, że nie jest realizacja szumu białego.  
+(Liczba wystających słupków poza przedział ufności).  
+Rząd modelu (na oko) to:
+
+* AR(p) - odczytywany z wykresu PACF
+    + AR(36)
+    + AR(12)
+* MA(q) - odczytywany z wykresu ACF
+    + MA(45)
+
+***
+
+***Sprawdzenie rzędu modeli***
+
+**a) Dane 1**
+
+**Rząd modelu wybierany "na oko"**
+
+```{r, echo=F}
+dane1_manual_yw1 <- ar(x = dane1.log.diff2, aic = F, order.max = 12, method = "yule-walker" )
+dane1_manual_mle1 <- ar(x = dane1.log.diff2, aic = F, order.max = 12, method = "mle" )
+```
+
+Zastosowanie metody **"Yule-Walker"** z wybranym przez nas rzędem 12
+
+```{r, echo=F}
+dane1_manual_yw1$ar
+```
+
+Zastosowanie metody **"MLE"** z wybranym przez nas rzędem 12
+
+```{r, echo=F}
+dane1_manual_mle1$ar
+```
+
+**Rząd modelu wybierany automatycznie**
+```{r, echo=F}
+dane1_auto_yw1<- ar(x = dane1.log.diff2, aic = T, order.max= 100, method = "yule-walker")
+dane1_auto_mle1 <- ar(x = dane1.log.diff2, aic = T, method = "mle")
+```
+
+Zastosowanie metody **"Yule-Walker"** z automatycznie wybranym rzędem
+
+```{r, echo=F}
+dane1_auto_yw1$ar
+```
+
+Zastosowanie metody **"MLE"** z automatycznie wybranym rzędem
+
+```{r, echo=F}
+dane1_auto_mle1$ar
+```
+
+**Wniosek:** Dobrany przez nas rząd modelu dla tego szeregu okazał się błędny. Automatycznie został wybrany rząd 1.
+
+***
+
+**b) Dane 2**
+
+**Rząd modelu wybierany "na oko"**
+
+```{r, echo=F}
+dane2_manual_yw <- ar(x = dane2.log.diff2, aic = F, order.max = 36, method = "yule-walker" )
+dane2_manual_mle <- ar(x = dane2.log.diff2, aic = F, order.max = 36, method = "mle" )
+```
+
+Zastosowanie metody **"Yule-Walker"** z wybranym przez nas rzędem 36
+
+```{r, echo=F}
+dane2_manual_yw$ar
+```
+
+Zastosowanie metody **"MLE"** z wybranym przez nas rzędem 36
+
+```{r, echo=F}
+dane2_manual_mle$ar
+```
+
+**Rząd modelu wybierany automatycznie**
+```{r, echo=F}
+dane2_auto_yw<- ar(x = dane2.log.diff2, aic = T, order.max= 100, method = "yule-walker")
+dane2_auto_mle <- ar(x = dane2.log.diff2, aic = T, method = "mle")
+```
+
+Zastosowanie metody **"Yule-Walker"** z automatycznie wybranym rzędem
+
+```{r, echo=F}
+dane2_auto_yw$ar
+```
+
+Zastosowanie metody **"MLE"** z automatycznie wybranym rzędem
+
+```{r, echo=F}
+dane2_auto_mle$ar
+```
+
+**Wniosek:** W tym przypadku dobrany przez nas rząd modelu okazał się prawidłowy - Rząd 36.  
+Patrzyłem na ostatnią wartość wystającą poza przedział ufności w wykresie PACF.
+
+***
+
+***
+
+## Wyznaczanie optymalnych modeli za pomocą funkcji auto.arima()
+
+**a) Dane 1**
+
+```{r, echo=F}
+dane1.arimaAIC <- auto.arima(dane1, ic="aic")
+summary(dane1.arimaAIC)
+```
+
+Auto.arima() z wykorzystaniem kryterium AIC (powyżej)
+
+```{r, echo=F}
+dane1.arimaAICC <- auto.arima(dane1, ic="aicc")
+summary(dane1.arimaAICC)
+```
+
+Auto.arima() z wykorzystaniem kryterium AICC (powyżej)
+
+```{r, echo=F}
+dane1.arimaBIC <- auto.arima(dane1, ic="bic")
+summary(dane1.arimaBIC)
+```
+
+Auto.arima() z wykorzystaniem kryterium BIC (powyżej)
+
+
+***Wnioski:*** Patrzymy na na wartości *RMSE*, *MAE*, *MAPE*, *MASE* i wybieramy ten model, w którym są one najmniejsze.  
+W tym przypadku obojętne jest, który model wybierzemy - wszystkie wartości są takie same.
+
+***
+
+**b) Dane 2**
+
+```{r, echo=F}
+dane2.arimaAIC <- auto.arima(dane2, ic="aic")
+summary(dane2.arimaAIC)
+```
+
+Auto.arima() z wykorzystaniem kryterium AIC (powyżej)
+
+```{r, echo=F}
+dane2.arimaAICC <- auto.arima(dane2, ic="aicc")
+summary(dane2.arimaAICC)
+```
+
+Auto.arima() z wykorzystaniem kryterium AICC (powyżej)
+
+```{r, echo=F}
+dane2.arimaBIC <- auto.arima(dane2, ic="bic")
+summary(dane2.arimaBIC)
+```
+
+Auto.arima() z wykorzystaniem kryterium BIC (powyżej)
+
+
+***Wnioski:*** Patrzymy na na wartości *RMSE*, *MAE*, *MAPE*, *MASE* i wybieramy ten model, w którym są one najmniejsze.  
+W tym przypadku wybieramy model AIC lub AICC - w modelu BIC wartości interesujących nas parametrów są największe.
+
+***
+
+***
+
+## Prognozowanie
+
+**1) Podstawowe**
+
+**a) Szereg 1**
+
+Prognoza: Metoda na podstawie średniej:
+
+```{r, echo=F}
+prognoza1 <- meanf(dane1, h=24)
+accuracy(prognoza1)
+```
+
+Prognoza: Metoda na podstawie średniej lambda = 0:
+
+```{r, echo=F}
+prognoza2 <- meanf(dane1, h=24, lambda = 0)
+accuracy(prognoza2)
+```
+
+Prognoza: Metoda naiwna:
+
+```{r, echo=F}
+prognoza3 <- naive(dane1, h=24, lambda = 0)
+accuracy(prognoza3)
+```
+
+Prognoza: Metoda naiwna sezonowa:
+
+```{r, echo=F}
+prognoza4 <- snaive(dane1, h=24, lambda = 0)
+accuracy(prognoza4)
+```
+
+Prognoza: Metoda uwzględniająca dryf:
+
+```{r, echo=F}
+prognoza5 <- rwf(dane1, h=24, drift = T) 
+accuracy(prognoza5)
+```
+
+**Wniosek:** Najlepszą prognozą jest Prognoza nr 5 (Metoda błądzenia losowego z dryfem)  
+Parametry *RMSE*, *MAE*, *MAPE*, *MASE*, sa najmniejsze w porównaniu z innymi parametrami w innych modelach.
+
+***
+
+```{r, echo=F}
+plot(prognoza1, main="PROGNOZA: Metoda na podstawie sredniej")
+plot(prognoza2, main="PROGNOZA: Metoda na podstawie sredniej
+     lambda = 0")
+```
+
+```{r, echo=F}
+plot(prognoza3, main="PROGNOZA: Metoda naiwna")
+plot(prognoza4, main="PROGNOZA: Metoda naiwna sezonowa")
+```
+
+```{r, echo=F}
+plot(prognoza5, main="PROGNOZA: Metoda uwzgledniajaca dryf")
+```
+
+***
+
+**a) Szereg 2**
+
+Prognoza: Metoda na podstawie średniej:
+
+```{r, echo=F}
+prognoza11 <- meanf(dane2, h=24)
+accuracy(prognoza11)
+```
+
+Prognoza: Metoda na podstawie średniej lambda = 0:
+
+```{r, echo=F}
+prognoza22 <- meanf(dane2, h=24, lambda = 0)
+accuracy(prognoza22)
+```
+
+Prognoza: Metoda naiwna:
+
+```{r, echo=F}
+prognoza33 <- naive(dane2, h=24, lambda = 0)
+accuracy(prognoza33)
+```
+
+Prognoza: Metoda naiwna sezonowa:
+
+```{r, echo=F}
+prognoza44 <- snaive(dane2, h=24, lambda = 0)
+accuracy(prognoza44)
+```
+
+Prognoza: Metoda uwzględniająca dryf:
+
+```{r, echo=F}
+prognoza55 <- rwf(dane2, h=24, drift = T) 
+accuracy(prognoza55)
+```
+
+**Wniosek:** Najlepszą prognozą jest Prognoza nr 5 (Metoda błądzenia losowego z dryfem)  
+Parametry *RMSE*, *MAE*, *MAPE*, *MASE*, sa najmniejsze w porównaniu z innymi parametrami w innych modelach.
+
+***
+
+```{r, echo=F}
+plot(prognoza11, main="PROGNOZA: Metoda na podstawie sredniej")
+plot(prognoza22, main="PROGNOZA: Metoda na podstawie sredniej
+     lambda = 0")
+```
+
+```{r, echo=F}
+plot(prognoza33, main="PROGNOZA: Metoda naiwna")
+plot(prognoza44, main="PROGNOZA: Metoda naiwna sezonowa")
+```
+
+```{r, echo=F}
+plot(prognoza55, main="PROGNOZA: Metoda uwzgledniajaca dryf")
+```
+
+***
+
+**2) Zbiory: testowy i uczący**
+
+Wykorzystanie algorytmów na Szeregu 1 (Trend + Sezonowość).  
+Podzielenie danych na dwa zbiory - uczący i testujący. W zbiorze uczącym dane od stycznia 2000 do grudnia 2018.  
+W zbiorze testującym dane od stycznia 2019 roku.
+
+```{r, echo=F}
+dane1.train <- window(dane1, end=c(2018,12))
+dane1.test <- window(dane1, start=c(2019,1))
+```
+
+Długość wektora z danymi uczącymi:
+
+```{r,echo=F}
+length(dane1.train)
+```
+
+Długość wektora z danymi testującymi:
+
+```{r, echo=F}
+length(dane1.test)
+```
+
+```{r, echo=F}
+prognoza1.train <- meanf(dane1.train, h =24)
+prognoza2.train <- meanf(dane1.train, h =24, lambda=0)
+prognoza3.train <- naive(dane1.train, h =24, lambda=0)
+prognoza4.train <- snaive(dane1.train, h =24, lambda=0)
+prognoza5.train <- rwf(dane1.train, h =24, drift=T)
+
+zakres.y <- c(0.95, 1.05)*range(dane1, dane1.test)
+```
+
+Prognoza: Metoda na podstawie średniej:
+
+```{r, echo=F}
+accuracy(prognoza1.train)
+```
+
+Prognoza: Metoda na podstawie średniej lambda = 0:
+
+```{r, echo=F}
+accuracy(prognoza2.train)
+```
+
+Prognoza: Metoda naiwna:
+
+```{r, echo=F}
+accuracy(prognoza3.train)
+```
+
+Prognoza: Metoda naiwna sezonowa:
+
+```{r, echo=F}
+accuracy(prognoza4.train)
+```
+
+Prognoza: Metoda uwzględniająca dryf:
+
+```{r, echo=F}
+accuracy(prognoza5.train)
+```
+
+***
+
+**Wykresy prognoz:**
+
+```{r, echo=F}
+plot(prognoza1.train, ylim=zakres.y, main="PROGNOZA: Metoda na podstawie sredniej")
+lines(dane1.test, col="red", lty=1, lwd=3)
+plot(prognoza2.train, ylim=zakres.y, main="PROGNOZA: Metoda na podstawie sredniej
+     lambda = 0")
+lines(dane1.test, col="red", lty=1, lwd=3)
+plot(prognoza3.train, ylim=zakres.y, main="PROGNOZA: Metoda naiwna")
+lines(dane1.test, col="red", lty=1, lwd=3)
+plot(prognoza4.train, ylim=zakres.y, main="PROGNOZA: Metoda naiwna sezonowa")
+lines(dane1.test, col="red", lty=1, lwd=3)
+plot(prognoza5.train, ylim=zakres.y, main="PROGNOZA: Metoda uwzgledniajaca dryf")
+lines(dane1.test, col="red", lty=1, lwd=3)
+```
+
+***
+
+***
+
+***
+
+***
