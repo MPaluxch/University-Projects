@@ -1,0 +1,55 @@
+---
+title: "Interaktywne wykresy"
+author: "Maciej Paluch"
+date: "16.01.2022"
+output: html_document
+---
+
+
+## Biblioteka do interaktywnych wykresów: _"rgl"_
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(rgl) 
+options(rgl.useNULL=TRUE)
+knitr::knit_hooks$set(webgl = hook_webgl)
+
+```
+
+
+```{r echo=TRUE, webgl = TRUE}
+x <- seq(-5, 5, length.out = 30)
+y <- seq(-5, 5, length.out = 30)
+
+f <- function(x,y) {((3*x^2)-3*y^2+3*y^4+4*(x))}
+z <- outer(x, y, f)
+
+open3d()
+persp3d(x,y,z,theta=50, phi=25,expand=1,col = "lightblue",xlab = "X",
+        ylab = "Y", zlab = "Z",ticktype = "detailed")
+
+
+```
+
+Po wpisaniu poniższego kodu do środowiska R w miejsce pętli powinno pokazać się nowe okno z interaktywnym wykresem.
+```{r eval=FALSE}
+library(rgl)
+open3d()
+persp3d(x,y,z,theta=50, phi=25,expand=1,col = "lightblue",xlab = "X",
+        ylab = "Y", zlab = "Z",ticktype = "detailed")
+```
+
+Inny przykład: 
+```{r echo=TRUE, webgl = TRUE}
+x <- seq(-5, 5, length.out = 30)
+y <- seq(-5, 5, length.out = 30)
+
+f1<-function(x,y) {(1-x)^2+20*(y^2-x^2)^2+y^2+y^4+x^4-300-3*x-3*y}
+z <- outer(x, y, f1)
+
+open3d()
+persp3d(x,y,z,theta=50, phi=25,expand=1,col = "lightblue",xlab = "X",
+        ylab = "Y", zlab = "Z",ticktype = "detailed")
+
+
