@@ -1,0 +1,837 @@
+---
+title: "Analiza statystyczna na zbiorze Wine Quality"
+author: "Maciej Paluch"
+date: "31.08.2021"
+output: html_document
+---
+
+Załadowanie potrzebnych bibliotek:
+
+```{r, echo =T, results=FALSE, message=FALSE, warning=FALSE}
+library(e1071) # do kurtozy
+library(dplyr) # do lepszego zarzadzania danymi
+library(ggplot2) # pakiet graficzny
+library(ggcorrplot) # do korelacji
+library(knitr) # tabelki
+library(DT) # tabelki
+```
+
+Wczytanie zbioru danych i podglądnięcie tabeli z danymi (___interaktywna tabela___):
+
+```{r, echo =T, results=T, message=FALSE, warning=FALSE}
+danewina <- read.csv2("winequality.csv", header= T)
+datatable(danewina, width = "100%", options=list(scrollX = T))
+```
+Objaśnienie 15 zmiennych:
+
+* __region__ - _regiony włoskie_
+
+* __color__ - _kolor wina_ 
+
+* __fixed.acidity__ - _kwasowość pierwotna wina_ 
+
+* __volatile.acidity__ - _kwasowość powstała podczas procesu dojrzewania_ 
+
+* __citric.acid__ - _stężenie kwasu cytrynowego_ 
+
+* __residual.sugar__ - _zawartość cukru pozostała po procesie fermentacji_ 
+
+* __chlorides__ – _zawartość chlorku sodu_ 
+
+* __free.sulfur.dioxide__ - _zawartość wolnego dwutlenku siarki_ 
+
+* __total.sulfur.dioxide__ - _całkowita zawartość dwutlenku siarki_ 
+
+* __density__ – _gęstość wina_ 
+
+* __pH__ – _odczyn wina wyrażony przez poziom pH_
+
+* __sulphates__ - _zawartość siarczanu potasu_ 
+
+* __sulphates.after.filtering__ - _zawartość siarczanu potasu po filtracji_
+
+* __alcohol__ - _procentowa zawartość alkoholu_
+
+* __quality__ - _wynik oceny eksperckiej wina (w skali 0-10)_
+
+***
+
+## Analiza - __Spis Treści__
+Analiza została przeprowadzona na podstawie zadań.  
+Lista zadań:  
+
+* [Scharakteryzuj 5 wybranych zmiennych: minimum, pierwszy kwartyl, medina, średnia, trzeci kwartyl, maksimum, odchylenie standardowe, wybraną miarę asymetrii i koncentracji w każdej z 6 grup: wina czerwone z Katanii, wina białe z Katanii, wina czerwone z Bolonii itd.](#zadanie-1)  
+
+* [Dla wybranych 4 zmiennych zrób wykres ramka-wąsy (boxplot). Niech kolor wina będzie tworzył serie. Dodał tytuł, opis osi, legendę.](#zadanie-2)  
+
+* [Dla wybranych 4 zmiennych zrób wykres ramka-wąsy (boxplot). Niech region Włoch będzie tworzył serie. Dodał tytuł, opis osi, legendę.](#zadanie-3)  
+
+* [Dla dwóch par wybranych zmiennych zrób wykres rozrzutu. Niech kolor wina będzie tworzył serie. Dodał tytuł, opis osi, legendę.](#zadanie-4)  
+
+* [Dla dwóch par wybranych zmiennych zrób wykres rozrzutu. Niech region Włoch będzie tworzył serie. Dodał tytuł, opis osi, legendę.](#zadanie-5)
+
+* [Zbuduj 95% przedział ufności dla średniej i wariancji dla dwóch wybranych zmiennych dla wszystkich win ogółem oraz osobno dla win z Bolonii, Katanii i Emilii Romany.](#zadanie-6)
+
+* [Sprawdź czy poziom siarki istotnie zmienił się po filtracji (zmienne sulphates i sulphates after filtering). Test wykonaj dla wszystkich win ogółem jak i w podziale na kolor wina.](#zadanie-7)
+
+* [Wybierz 5 zmiennych charakterystyk wina. Sprawdź czy średni poziom każdej zmiennej różni się pomiędzy grupą win czerwonych a białych.](#zadanie-8)
+
+* [Wybierz 5 zmiennych charakterystyk wina. Sprawdź czy wariancja każdej zmiennej różni się pomiędzy grupą win czerwonych a białych.](#zadanie-9)
+
+* [Wybierz 5 zmiennych charakterystyk wina. Sprawdź czy średni poziom każdej zmiennej różni się pomiędzy regionami Włoch.](#zadanie-10)
+
+* [Od czego zależy jakość wina? (zmienna quality) Użyj różnych pomysłów, metod i wizualizacji.](#zadanie-11)
+
+
+## Zadanie 1
+
+* Scharakteryzuj 5 wybranych zmiennych: minimum, pierwszy kwartyl, medina, średnia, trzeci kwartyl, maksimum, odchylenie standardowe, wybraną miarę asymetrii i koncentracji w każdej z 6 grup: wina czerwone z Katanii, wina białe z Katanii, wina czerwone z Bolonii itd.  
+  
+    
+Wybrane zmienne:  
+
+* __pH__ - _odczyn wina wyrażony przez poziom pH_  
+
+* __alcohol__ - _procentowa zawartość alkoholu_  
+
+* __chlorides__ - _zawartość chlorku sodu_  
+
+* __quality__ - _wynik oceny ekspertów od wina (w skali 0-10)_  
+
+* __citric.acid__ - _stężenie kwasu cytrynowego_  
+
+```{r, echo =T, results=F, message=FALSE, warning=FALSE}
+Catania_Wine <- danewina[danewina$region == "Catania", ]
+Bolonia_Wine <- danewina[danewina$region == "Bolonia", ]
+EmiliaRomana_Wine <- danewina[danewina$region == "Emilia Romana", ]
+```
+
+Funkcja do wyboru regionu, interesującej nas zmiennej i wartości statystycznej (do agregacji):
+```{r, echo =T, results=F, message=FALSE, warning=FALSE}
+aggregateFunction <- function(x,y,z){
+  aggregate(list("value"= x), list(Color=y), FUN= z)
+}
+```
+
+Wyświetlenie funkcji dla wartości pH. W dalszych agregacjach zmienia się tylko odpowiednie parametry.  
+(dlatego nie są wyświetlone kody do nich - dla przejrzystości raportu)
+
+
+```{r, echo =T, results=F, message=FALSE, warning=FALSE}
+# srednia
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, mean) 
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, mean)
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, mean)
+
+# mediana 
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, median)
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, median)
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, median)
+
+# kwantyle
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, quantile) 
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, quantile)
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, quantile)
+
+# wartosc min 
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, min)
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, min)
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, min)
+
+# wartosc max
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, max)
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, max)
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, max)
+
+# odchylenie standardowe 
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, sd)
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, sd) 
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, sd) 
+
+# kurtoza
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, kurtosis)
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, kurtosis) 
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, kurtosis) 
+
+# skosnosc - trzeci moment centralny
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, skewness)
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, skewness) 
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, skewness)
+```
+
+### Dla wartości __pH__:
+```{r, echo =F, results=T, message=FALSE, warning=FALSE}
+pHtableB <- data.frame(
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, mean)[1],
+aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, mean)[[2]])
+pHtableB$Mediana <- aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, median)[[2]]
+pHtableB$Kwartyl1 <- aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+pHtableB$Kwartyl3 <- aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+pHtableB$Min <- aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, min)[[2]]
+pHtableB$Max <- aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, max)[[2]]
+pHtableB$OdchStand <-  aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, sd)[[2]]
+pHtableB$Kurtoza <- aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, kurtosis)[[2]]
+pHtableB$Skosnosc <- aggregateFunction(Bolonia_Wine$pH,  Bolonia_Wine$color, skewness)[[2]]
+
+names(pHtableB) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(pHtableB, caption = "Parametry Statystyczne dla zmiennej __pH__ w regionie __Bolonia__")
+
+pHtableC <- data.frame(
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, mean)[1],
+aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, mean)[[2]])
+pHtableC$Mediana <- aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, median)[[2]]
+pHtableC$Kwartyl1 <- aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+pHtableC$Kwartyl3 <- aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+pHtableC$Min <- aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, min)[[2]]
+pHtableC$Max <- aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, max)[[2]]
+pHtableC$OdchStand <-  aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, sd)[[2]]
+pHtableC$Kurtoza <- aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, kurtosis)[[2]]
+pHtableC$Skosnosc <- aggregateFunction(Catania_Wine$pH,  Catania_Wine$color, skewness)[[2]]
+
+names(pHtableC) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(pHtableC, caption = "Parametry Statystyczne dla zmiennej __pH__ w regionie __Catania__")
+
+pHtableER <- data.frame(
+aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, mean)[1],
+aggregateFunction(EmiliaRomana_Wine$pH, EmiliaRomana_Wine$color, mean)[[2]])
+pHtableER$Mediana <- aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, median)[[2]]
+pHtableER$Kwartyl1 <- aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+pHtableER$Kwartyl3 <- aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+pHtableER$Min <- aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, min)[[2]]
+pHtableER$Max <- aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, max)[[2]]
+pHtableER$OdchStand <-  aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, sd)[[2]]
+pHtableER$Kurtoza <- aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, kurtosis)[[2]]
+pHtableER$Skosnosc <- aggregateFunction(EmiliaRomana_Wine$pH,  EmiliaRomana_Wine$color, skewness)[[2]]
+
+names(pHtableER) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(pHtableER, caption = "Parametry Statystyczne dla zmiennej __pH__ w regionie __Emilia Romana__")
+```
+
+### Dla wartości __alcohol__:
+```{r, echo =F, results=T, message=FALSE, warning=FALSE}
+alcoholtableB <- data.frame(
+aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, mean)[1],
+aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, mean)[[2]])
+alcoholtableB$Mediana <- aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, median)[[2]]
+alcoholtableB$Kwartyl1 <- aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+alcoholtableB$Kwartyl3 <- aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+alcoholtableB$Min <- aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, min)[[2]]
+alcoholtableB$Max <- aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, max)[[2]]
+alcoholtableB$OdchStand <-  aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, sd)[[2]]
+alcoholtableB$Kurtoza <- aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, kurtosis)[[2]]
+alcoholtableB$Skosnosc <- aggregateFunction(Bolonia_Wine$alcohol,  Bolonia_Wine$color, skewness)[[2]]
+
+names(alcoholtableB) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(alcoholtableB, caption = "Parametry Statystyczne dla zmiennej __alcohol__ w regionie __Bolonia__")
+
+alcoholtableC <- data.frame(
+aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, mean)[1],
+aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, mean)[[2]])
+alcoholtableC$Mediana <- aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, median)[[2]]
+alcoholtableC$Kwartyl1 <- aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+alcoholtableC$Kwartyl3 <- aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+alcoholtableC$Min <- aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, min)[[2]]
+alcoholtableC$Max <- aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, max)[[2]]
+alcoholtableC$OdchStand <-  aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, sd)[[2]]
+alcoholtableC$Kurtoza <- aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, kurtosis)[[2]]
+alcoholtableC$Skosnosc <- aggregateFunction(Catania_Wine$alcohol,  Catania_Wine$color, skewness)[[2]]
+
+names(alcoholtableC) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(alcoholtableC, caption = "Parametry Statystyczne dla zmiennej __alcohol__ w regionie __Catania__")
+
+alcoholtableER <- data.frame(
+aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, mean)[1],
+aggregateFunction(EmiliaRomana_Wine$alcohol, EmiliaRomana_Wine$color, mean)[[2]])
+alcoholtableER$Mediana <- aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, median)[[2]]
+alcoholtableER$Kwartyl1 <- aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+alcoholtableER$Kwartyl3 <- aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+alcoholtableER$Min <- aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, min)[[2]]
+alcoholtableER$Max <- aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, max)[[2]]
+alcoholtableER$OdchStand <-  aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, sd)[[2]]
+alcoholtableER$Kurtoza <- aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, kurtosis)[[2]]
+alcoholtableER$Skosnosc <- aggregateFunction(EmiliaRomana_Wine$alcohol,  EmiliaRomana_Wine$color, skewness)[[2]]
+
+names(alcoholtableER) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(alcoholtableER, caption = "Parametry Statystyczne dla zmiennej __alcohol__ w regionie __Emilia Romana__")
+```
+### Dla wartości __chlorides__:
+```{r, echo =F, results=T, message=FALSE, warning=FALSE}
+chloridestableB <- data.frame(
+aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, mean)[1],
+aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, mean)[[2]])
+chloridestableB$Mediana <- aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, median)[[2]]
+chloridestableB$Kwartyl1 <- aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+chloridestableB$Kwartyl3 <- aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+chloridestableB$Min <- aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, min)[[2]]
+chloridestableB$Max <- aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, max)[[2]]
+chloridestableB$OdchStand <-  aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, sd)[[2]]
+chloridestableB$Kurtoza <- aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, kurtosis)[[2]]
+chloridestableB$Skosnosc <- aggregateFunction(Bolonia_Wine$chlorides,  Bolonia_Wine$color, skewness)[[2]]
+
+names(chloridestableB) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(chloridestableB, caption = "Parametry Statystyczne dla zmiennej __chlorides__ w regionie __Bolonia__")
+
+chloridestableC <- data.frame(
+aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, mean)[1],
+aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, mean)[[2]])
+chloridestableC$Mediana <- aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, median)[[2]]
+chloridestableC$Kwartyl1 <- aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+chloridestableC$Kwartyl3 <- aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+chloridestableC$Min <- aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, min)[[2]]
+chloridestableC$Max <- aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, max)[[2]]
+chloridestableC$OdchStand <-  aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, sd)[[2]]
+chloridestableC$Kurtoza <- aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, kurtosis)[[2]]
+chloridestableC$Skosnosc <- aggregateFunction(Catania_Wine$chlorides,  Catania_Wine$color, skewness)[[2]]
+
+names(chloridestableC) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(chloridestableC, caption = "Parametry Statystyczne dla zmiennej __chlorides__ w regionie __Catania__")
+
+chloridestableER <- data.frame(
+aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, mean)[1],
+aggregateFunction(EmiliaRomana_Wine$chlorides, EmiliaRomana_Wine$color, mean)[[2]])
+chloridestableER$Mediana <- aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, median)[[2]]
+chloridestableER$Kwartyl1 <- aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+chloridestableER$Kwartyl3 <- aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+chloridestableER$Min <- aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, min)[[2]]
+chloridestableER$Max <- aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, max)[[2]]
+chloridestableER$OdchStand <-  aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, sd)[[2]]
+chloridestableER$Kurtoza <- aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, kurtosis)[[2]]
+chloridestableER$Skosnosc <- aggregateFunction(EmiliaRomana_Wine$chlorides,  EmiliaRomana_Wine$color, skewness)[[2]]
+
+names(chloridestableER) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(chloridestableER, caption = "Parametry Statystyczne dla zmiennej __chlorides__ w regionie __Emilia Romana__")
+```
+
+
+
+
+
+
+
+
+
+
+
+### Dla wartości __quality__:
+```{r, echo =F, results=T, message=FALSE, warning=FALSE}
+qualitytableB <- data.frame(
+aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, mean)[1],
+aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, mean)[[2]])
+qualitytableB$Mediana <- aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, median)[[2]]
+qualitytableB$Kwartyl1 <- aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+qualitytableB$Kwartyl3 <- aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+qualitytableB$Min <- aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, min)[[2]]
+qualitytableB$Max <- aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, max)[[2]]
+qualitytableB$OdchStand <-  aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, sd)[[2]]
+qualitytableB$Kurtoza <- aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, kurtosis)[[2]]
+qualitytableB$Skosnosc <- aggregateFunction(Bolonia_Wine$quality,  Bolonia_Wine$color, skewness)[[2]]
+
+names(qualitytableB) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(qualitytableB, caption = "Parametry Statystyczne dla zmiennej __quality__ w regionie __Bolonia__")
+
+qualitytableC <- data.frame(
+aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, mean)[1],
+aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, mean)[[2]])
+qualitytableC$Mediana <- aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, median)[[2]]
+qualitytableC$Kwartyl1 <- aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+qualitytableC$Kwartyl3 <- aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+qualitytableC$Min <- aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, min)[[2]]
+qualitytableC$Max <- aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, max)[[2]]
+qualitytableC$OdchStand <-  aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, sd)[[2]]
+qualitytableC$Kurtoza <- aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, kurtosis)[[2]]
+qualitytableC$Skosnosc <- aggregateFunction(Catania_Wine$quality,  Catania_Wine$color, skewness)[[2]]
+
+names(qualitytableC) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(qualitytableC, caption = "Parametry Statystyczne dla zmiennej __quality__ w regionie __Catania__")
+
+qualitytableER <- data.frame(
+aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, mean)[1],
+aggregateFunction(EmiliaRomana_Wine$quality, EmiliaRomana_Wine$color, mean)[[2]])
+qualitytableER$Mediana <- aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, median)[[2]]
+qualitytableER$Kwartyl1 <- aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+qualitytableER$Kwartyl3 <- aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+qualitytableER$Min <- aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, min)[[2]]
+qualitytableER$Max <- aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, max)[[2]]
+qualitytableER$OdchStand <-  aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, sd)[[2]]
+qualitytableER$Kurtoza <- aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, kurtosis)[[2]]
+qualitytableER$Skosnosc <- aggregateFunction(EmiliaRomana_Wine$quality,  EmiliaRomana_Wine$color, skewness)[[2]]
+
+names(qualitytableER) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(qualitytableER, caption = "Parametry Statystyczne dla zmiennej __quality__ w regionie __Emilia Romana__")
+```
+### Dla wartości __citric.acid__:
+```{r, echo =F, results=T, message=FALSE, warning=FALSE}
+citrictableB <- data.frame(
+aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, mean)[1],
+aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, mean)[[2]])
+citrictableB$Mediana <- aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, median)[[2]]
+citrictableB$Kwartyl1 <- aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+citrictableB$Kwartyl3 <- aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+citrictableB$Min <- aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, min)[[2]]
+citrictableB$Max <- aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, max)[[2]]
+citrictableB$OdchStand <-  aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, sd)[[2]]
+citrictableB$Kurtoza <- aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, kurtosis)[[2]]
+citrictableB$Skosnosc <- aggregateFunction(Bolonia_Wine$citric.acid,  Bolonia_Wine$color, skewness)[[2]]
+
+names(citrictableB) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(citrictableB, caption = "Parametry Statystyczne dla zmiennej __citric.acid__ w regionie __Bolonia__")
+
+citrictableC <- data.frame(
+aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, mean)[1],
+aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, mean)[[2]])
+citrictableC$Mediana <- aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, median)[[2]]
+citrictableC$Kwartyl1 <- aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+citrictableC$Kwartyl3 <- aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+citrictableC$Min <- aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, min)[[2]]
+citrictableC$Max <- aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, max)[[2]]
+citrictableC$OdchStand <-  aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, sd)[[2]]
+citrictableC$Kurtoza <- aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, kurtosis)[[2]]
+citrictableC$Skosnosc <- aggregateFunction(Catania_Wine$citric.acid,  Catania_Wine$color, skewness)[[2]]
+
+names(citrictableC) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(citrictableC, caption = "Parametry Statystyczne dla zmiennej __citric.acid__ w regionie __Catania__")
+
+citrictableER <- data.frame(
+aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, mean)[1],
+aggregateFunction(EmiliaRomana_Wine$citric.acid, EmiliaRomana_Wine$color, mean)[[2]])
+citrictableER$Mediana <- aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, median)[[2]]
+citrictableER$Kwartyl1 <- aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.25))[[2]]
+citrictableER$Kwartyl3 <- aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, function(i) quantile(i,probs=0.75))[[2]]
+citrictableER$Min <- aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, min)[[2]]
+citrictableER$Max <- aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, max)[[2]]
+citrictableER$OdchStand <-  aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, sd)[[2]]
+citrictableER$Kurtoza <- aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, kurtosis)[[2]]
+citrictableER$Skosnosc <- aggregateFunction(EmiliaRomana_Wine$citric.acid,  EmiliaRomana_Wine$color, skewness)[[2]]
+
+names(citrictableER) <- c("Kolor","Srednia","Mediana","1.Kwartyl","3.Kwartyl","Min","Max","OdchStand","Kurtoza","Skosnosc")
+
+kable(citrictableER, caption = "Parametry Statystyczne dla zmiennej __citric.acid__ w regionie __Emilia Romana__")
+```
+
+***
+
+## Zadanie 2 ## 
+* Dla wybranych 4 zmiennych zrób wykres ramka-wąsy (boxplot). Niech kolor wina będzie tworzył serie. Dodał tytuł, opis osi, legendę.  
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+### Region - Bolonia ----
+par(oma = c(2,1,1,1), mfrow = c(2, 2), mar = c(2, 2, 1, 1))
+for (i in 1:4){
+  boxplot(Bolonia_Wine$pH ~ Bolonia_Wine$color, col=c("purple", "green"), main = "pH Value")
+  boxplot(Bolonia_Wine$alcohol ~ Bolonia_Wine$color, col=c("purple", "green"), main = "Alcohol Value") 
+  boxplot(Bolonia_Wine$quality ~ Bolonia_Wine$color, col=c("purple", "green"), main = "Quality Value")
+  boxplot(Bolonia_Wine$citric.acid ~ Bolonia_Wine$color, col=c("purple", "green"), main = "Citric Acid Value")
+}
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+plot(0, 0, type = 'l', main ="\n\nRegion - Bolonia", col.main="red", cex.main=1.3)
+legend( x ="bottom", legend = c("Wino Czerwone","Wino Białe"), col=c("purple", "green"),
+        lty=c(1,1), lwd=3, cex=0.9, horiz=T,  bty = "o")
+
+### Region - Catania ----
+par(oma = c(2,1,1,1), mfrow = c(2, 2), mar = c(2, 2, 1, 1))
+for (i in 1:4){
+  boxplot(Catania_Wine$pH ~ Catania_Wine$color, col=c("orange", "blue"), main = "pH Value")
+  boxplot(Catania_Wine$alcohol ~ Catania_Wine$color, col=c("orange", "blue"), main = "Alcohol Value") 
+  boxplot(Catania_Wine$quality ~ Catania_Wine$color, col=c("orange", "blue"), main = "Quality Value")
+  boxplot(Catania_Wine$citric.acid ~ Catania_Wine$color, col=c("orange", "blue"), main = "Citric Acid Value")
+}
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+plot(0, 0, type = 'l', main ="\n\nRegion - Catania", col.main="red", cex.main=1.3)
+legend( x ="bottom", legend = c("Wino Czerwone","Wino Białe"), col=c("orange", "blue"),
+        lty=c(1,1), lwd=3, cex=0.9, horiz=T,  bty = "o")
+
+### Region - Emilia Romana ----
+par(oma = c(2,1,1,1), mfrow = c(2, 2), mar = c(2, 2, 1, 1))
+for (i in 1:4){
+  boxplot(EmiliaRomana_Wine$pH ~ EmiliaRomana_Wine$color, col=c("brown", "yellow"), main = "pH Value")
+  boxplot(EmiliaRomana_Wine$alcohol ~ EmiliaRomana_Wine$color, col=c("brown", "yellow"), main = "Alcohol Value")
+  boxplot(EmiliaRomana_Wine$quality ~ EmiliaRomana_Wine$color, col=c("brown", "yellow"), main = "Quality Value") 
+  boxplot(EmiliaRomana_Wine$citric.acid ~ EmiliaRomana_Wine$color, col=c("brown", "yellow"), main = "Citric Acid Value")
+}
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+plot(0, 0, type = 'l', main ="\n\nRegion - Emilia Romana", col.main="red", cex.main=1.3)
+legend( x ="bottom", legend = c("Wino Czerwone","Wino Białe"), col=c("brown", "yellow"),
+        lty=c(1,1), lwd=3, cex=0.9, horiz=T,  bty = "o")
+```
+
+***  
+
+## Zadanie 3  
+* Dla wybranych 4 zmiennych zrób wykres ramka-wąsy (boxplot). Niech region Włoch będzie tworzył serie. Dodał tytuł, opis osi, legendę. 
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+par(oma = c(2,1,1,1), mfrow = c(2, 2), mar = c(2, 2, 1, 1))
+for (i in 1:4){
+  boxplot(danewina$pH ~ danewina$region, col=c("mediumvioletred", "gold1", "cadetblue2"), main = "pH Value", xlab="Color", ylab= "pH value")
+  boxplot(danewina$alcohol ~ danewina$region, col=c("mediumvioletred", "gold1", "cadetblue2"), main = "Alcohol Value", xlab="Color", ylab= "Chlorides value")
+  boxplot(danewina$sulphates ~ danewina$region, col=c("mediumvioletred", "gold1", "cadetblue2"), main = "Sulphates Value", xlab="Color", ylab= "Quality value")
+  boxplot(danewina$citric.acid ~ danewina$region, col=c("mediumvioletred", "gold1", "cadetblue2"), main = "Citric Acid Value", xlab="Color", ylab= "Citric Acid value")
+  
+}
+```
+
+***
+
+## Zadanie 4  
+* Dla dwóch par wybranych zmiennych zrób wykres rozrzutu. Niech kolor wina będzie tworzył serie. Dodał tytuł, opis osi, legendę.
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+par(mfrow=c(1,1))
+plot(pH ~ sulphates, data = danewina[danewina$color == "white", ], col= "darkgrey", 
+     ylim=range(danewina$pH), xlim=range(danewina$sulphates), pch= 1,
+     main = "Scatter Plot - pH ~ Sulphates")
+points(pH ~ sulphates, data = danewina[danewina$color == "red", ], col= "red", pch= 2)
+grid()
+legend( x ="topright", legend = c("White Wine","Red Wine"),
+        title ="Type of Wine: ", box.lty = 3,
+        col=c("darkgrey","red"), lty=c(1,1),
+        lwd=3, cex=0.9, horiz=F, bty = "o")
+
+par(mfrow=c(1,1))
+plot(pH ~ alcohol, data = danewina[danewina$color == "white", ], col= "darkgrey", 
+     ylim=range(danewina$pH), xlim=range(danewina$alcohol), pch= 1,
+     main = "Scatter Plot - pH ~ Alcohol")
+points(pH ~ alcohol, data = danewina[danewina$color == "red", ], col= "red", pch= 2)
+grid()
+legend( x ="topright", legend = c("White Wine","Red Wine"),
+        title ="Type of Wine: ", box.lty = 3,
+        col=c("darkgrey","red"), lty=c(1,1),
+        lwd=3, cex=0.9, horiz=F, bty = "o")
+```
+
+***
+
+## Zadanie 5  
+* Dla dwóch par wybranych zmiennych zrób wykres rozrzutu. Niech region Włoch będzie tworzył serie. Dodał tytuł, opis osi, legendę.
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+par(mfrow=c(1,1))
+plot(chlorides ~ sulphates, data = danewina[danewina$region == "Bolonia", ], col= "red", 
+     ylim=range(danewina$chlorides), xlim=range(danewina$sulphates), pch= 1,
+     main = "Scatter Plot - Chlorides ~ Sulphates")
+points(chlorides ~ sulphates, data = danewina[danewina$region == "Catania", ], col= "blue", pch= 2)
+points(chlorides ~ sulphates, data = danewina[danewina$region == "Emilia Romana", ], col= "green", pch= 3)
+grid()
+legend( x ="topleft", legend = c("Bolonia","Catania", "Emilia Romana"),
+        title ="Region: ", box.lty = 2,
+        col=c("red","blue", "green"), lty=c(1,1,1),
+        lwd=3, cex=0.9, horiz=F, bty = "o")
+
+par(mfrow=c(1,1))
+plot(citric.acid ~ alcohol, data = danewina[danewina$region == "Bolonia", ], col= "red", 
+     ylim=range(danewina$citric.acid), xlim=range(danewina$alcohol), pch= 1,
+     main = "Scatter Plot - Citric.acid ~ Alcohol")
+points(citric.acid ~ alcohol, data = danewina[danewina$region == "Catania", ], col= "blue", pch= 2)
+points(citric.acid ~ alcohol, data = danewina[danewina$region == "Emilia Romana", ], col= "green", pch= 3)
+grid()
+legend( x ="topleft", legend = c("Bolonia","Catania", "Emilia Romana"),
+        title ="Region: ", box.lty = 2,
+        col=c("red","blue", "green"), lty=c(1,1,1),
+        lwd=3, cex=0.9, horiz=F, bty = "o")
+```
+
+***
+
+## Zadanie 6  
+* Zbuduj 95% przedział ufności dla średniej i wariancji dla dwóch wybranych zmiennych dla wszystkich win ogółem oraz osobno dla win z Bolonii, Katanii i Emilii Romany.
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+### test dla sredniej ----
+
+# dla ogolnych danych
+wines_ttest <- t.test(x = danewina$pH, y= danewina$citric.acid, conf.level = 0.95)
+
+# dla regionu Bolonia
+winesB_ttest <- t.test(x = Bolonia_Wine$pH, y= Bolonia_Wine$citric.acid, conf.level = 0.95)
+
+# dla regionu Catania
+winesC_ttest <- t.test(x = Catania_Wine$pH, y= Catania_Wine$citric.acid, conf.level = 0.95)
+
+# dla regionu Emilia Romana
+winesER_ttest <- t.test(x = EmiliaRomana_Wine$pH, y= EmiliaRomana_Wine$citric.acid,conf.level = 0.95)
+
+# Ramka danych dla przedzialu wariancji
+meanintervaldf <- data.frame( c("Ogółem","Bolonia","Catania","Emilia Romana"),
+                              c(round(wines_ttest$conf.int[1],5), round(winesB_ttest$conf.int[1],5),
+                                round(winesC_ttest$conf.int[1],5), round(winesER_ttest$conf.int[1],5)),
+                              c(round(wines_ttest$conf.int[2],5), round(winesB_ttest$conf.int[2],5),
+                                round(winesC_ttest$conf.int[2],5), round(winesER_ttest$conf.int[2],5)))
+
+names(meanintervaldf) <- c("Region:","Min","Max")
+
+meanintervaldf
+
+### test dla wariancji ---- 
+
+# dla ogolnych danych
+wines_vartest <- var.test(x = danewina$pH, y= danewina$citric.acid, conf.level =0.95)
+
+# Dla regionu Bolonia
+winesB_vartest <- var.test(x = Bolonia_Wine$pH, y= Bolonia_Wine$citric.acid, conf.level =0.95)
+
+# Dla regionu Catania
+winesC_vartest <- var.test(x = Catania_Wine$pH, y= Catania_Wine$citric.acid, conf.level =0.95)
+
+# Dla regionu Emilia Romana
+winesER_vartest <- var.test(x = EmiliaRomana_Wine$pH, y= EmiliaRomana_Wine$citric.acid, conf.level =0.95)
+
+# Ramka danych dla przedzialu wariancji
+varintervaldf <- data.frame( c("Ogółem","Bolonia","Catania","Emilia Romana"),
+                             c(round(wines_vartest$conf.int[1],5), round(winesB_vartest$conf.int[1],5),
+                               round(winesC_vartest$conf.int[1],5), round(winesER_vartest$conf.int[1],5)),
+                             c(round(wines_vartest$conf.int[2],5), round(winesB_vartest$conf.int[2],5),
+                               round(winesC_vartest$conf.int[2],5), round(winesER_vartest$conf.int[2],5)))
+
+names(varintervaldf) <- c("Region:","Min","Max")
+
+varintervaldf	
+```
+
+***
+
+## Zadanie 7  
+* Sprawdź czy poziom siarki istotnie zmienił się po filtracji (zmienne sulphates i sulphates after filtering). Test wykonaj dla wszystkich win ogółem jak i w podziale na kolor wina.
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+# ogolne dane
+t.test(x = danewina$sulphates, 
+       y = danewina$sulphates.after.filtering, 
+       conf.level = 0.95)
+
+# wino biale
+t.test(x = danewina$sulphates[danewina$color == "white"], 
+       y = danewina$sulphates.after.filtering[danewina$color == "white"], 
+       conf.level = 0.95)
+
+# wino czerwone
+t.test(x = danewina$sulphates[danewina$color == "red"], 
+       y = danewina$sulphates.after.filtering[danewina$color == "red"], 
+       conf.level = 0.95)
+
+```
+__Wniosek:__ We wszystkich przypadkach mamy podstawy do odrzucenia hipotezy zerowej mówiącej że średnia przed filtracją jest równa średniej po filtracji. (Zwracamy uwagę na wartość ___p___. Jest ona mniejsza od _0.05_ [przedział ufności ustawiony na _0.95_], a więc odrzucamy hipotezę zerową).
+Oznacza to że średnie każdego z ww. przypadków istotnie różnią się od siebie - a więc również i poziom zmienił się istotnie. 
+
+***
+
+## Zadanie 8  
+* Wybierz 5 zmiennych charakterystyk wina. Sprawdź czy średni poziom każdej zmiennej różni się pomiędzy grupą win czerwonych a białych.
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+## zmienna Sulphates
+t.test(danewina$sulphates[danewina$color == "white"], danewina$sulphates[danewina$color == "red"], 
+       conf.level = 0.95)
+
+## zmienna pH
+t.test(danewina$pH[danewina$color == "white"], danewina$pH[danewina$color == "red"], 
+       conf.level = 0.95)
+
+## zmienna Alcohol
+t.test(danewina$alcohol[danewina$color == "white"], danewina$alcohol[danewina$color == "red"], 
+       conf.level = 0.95)
+
+## zmienna Citric.acid
+t.test(x = danewina$citric.acid[danewina$color == "white"], danewina$citric.acid[danewina$color == "red"], 
+       conf.level = 0.95)
+
+## zmienna Quality
+t.test(x = danewina$quality[danewina$color == "white"], danewina$quality[danewina$color == "red"], 
+       conf.level = 0.95)
+
+```
+__Wniosek:__ We wszystkich przypadkach mamy podstawy do odrzucenia hipotezy zerowej mowiącej że różnica średnich każdej badanej pary zmiennych wynosi 0 (średnie są sobie równe).  
+Jak można zauważyć, wartości parametru ___p___ są bardzo małe w większości wyników. Wyjątkiem jest test dla zmiennej Alcohol, gdzie wartość ___p___ wynosi _0.004278_. Jest to jednak dalej wartość mniejsza od _0.05_ - a więc również są podstawy do odrzucenia hipotezy zerowej. 
+
+***
+
+## Zadanie 9  
+* Wybierz 5 zmiennych charakterystyk wina. Sprawdź czy wariancja każdej zmiennej różni się pomiędzy grupą win czerwonych a białych.
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+## Zmienna Quality
+var.test(danewina$quality[danewina$color=="red"], danewina$quality[danewina$color== "white"])
+
+## Zmienna pH
+var.test(danewina$pH[danewina$color=="red"], danewina$pH[danewina$color== "white"])
+
+## Zmienna Chlorides
+var.test(danewina$chlorides[danewina$color=="red"], danewina$chlorides[danewina$color== "white"])
+
+## Zmienna Sulphates
+var.test(danewina$sulphates[danewina$color=="red"], danewina$sulphates[danewina$color== "white"])
+
+## Zmienna Density
+var.test(danewina$density[danewina$color=="red"], danewina$density[danewina$color== "white"])
+```
+__Wniosek:__ Wartość ___p___ dla testu zmiennej pH wynosi _0.2716_ i jest większa od poziomu istotności _0.05_. W takim przypadku pozostajemy przy hipotezie zerowej mówiącej że współczynnik wariancji jest równy 1.  
+Podsumowując, nie ma istotnej różnicy pomiędzy obiema wariancjami dla koloru wina i zmiennej pH.  
+W pozostałych przypadkach odrzucamy hipotezę zerową - jest istotna różnica pomiędzy wariancjami.
+
+***
+
+## Zadanie 10  
+* Wybierz 5 zmiennych charakterystyk wina. Sprawdź czy średni poziom każdej zmiennej różni się pomiędzy regionami Włoch.
+
+### _Catania - Bolonia_
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+t.test(Catania_Wine$sulphates, Bolonia_Wine$sulphates)
+t.test(Catania_Wine$pH, Bolonia_Wine$pH)
+t.test(Catania_Wine$alcohol, Bolonia_Wine$alcohol) 
+t.test(Catania_Wine$citric.acid, Bolonia_Wine$citric.acid)
+t.test(Catania_Wine$quality, Bolonia_Wine$quality)
+```
+__Wniosek:__ Dla każdego testu wartość ___p___ okazała się być bardzo mała. Odrzucamy hipotezę zerową mówiącą że różnica średnich wynosi 0. Odpowiedź - średni poziom różni się istotnie statystycznie.
+
+
+### _Catania - Emilia Romana_
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+t.test(Catania_Wine$sulphates, EmiliaRomana_Wine$sulphates)
+t.test(Catania_Wine$pH, EmiliaRomana_Wine$pH)
+t.test(Catania_Wine$alcohol, EmiliaRomana_Wine$alcohol) 
+t.test(Catania_Wine$citric.acid, EmiliaRomana_Wine$citric.acid)
+t.test(Catania_Wine$quality, EmiliaRomana_Wine$quality)
+```
+__Wniosek:__ Dla testu badającego średnie zmiennej Quality wartość ___p___ wynosi _0.8986_. Oznacza to, że odrzucamy hipotezę zerową na rzecz hipotezy alternatywnej, mowiącej że różnica pomiędzy średnimi nie jest równa _0_.  
+Odpowiedź - średni poziom pomiędzy regionami Catania i Emilia Romana dla zmiennej Quality nie różni się od siebie. Dla pozostałych przypadków - odrzucamy hipotezę zerową (średni poziom różni się istotnie).
+
+### _Emilia Romana - Bolonia_
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+t.test(EmiliaRomana_Wine$sulphates, Bolonia_Wine$sulphates)
+t.test(EmiliaRomana_Wine$pH, Bolonia_Wine$pH)
+t.test(EmiliaRomana_Wine$alcohol, Bolonia_Wine$alcohol) 
+t.test(EmiliaRomana_Wine$citric.acid, Bolonia_Wine$citric.acid)
+t.test(EmiliaRomana_Wine$quality, Bolonia_Wine$quality)
+```
+__Wniosek:__ Dla każdego testu wartość ___p___ okazała się być bardzo mała. Odrzucamy hipotezę zerową mówiącą że różnica średnich wynosi 0. Odpowiedź - średni poziom różni się istotnie statystycznie.
+
+***
+
+## Zadanie 11  
+* Od czego zależy jakość wina? (zmienna quality) Użyj różnych pomysłów, metod i wizualizacji. 
+
+### ___Korelacja___
+
+Do analizy korelacji potrzebujemy danych typu numeric i oczyszczonych z braków danych ( _NA_ ).
+
+```{r, echo =T, results=F, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+wine_numeric <- select_if(danewina, is.numeric)
+res <- as.data.frame(cor(na.omit(wine_numeric)))
+```
+
+Sprawdzenie korelacji pomiędzy zmiennymi:
+
+* Współczynnik korelacji R zawiera się w przedziale ___[-1; 1]___ 
+
+    + __korelacja dodatnia__ - informacja, że wzrostowi wartości jednej cechy towarzyszy wzrost wartości drugiej cechy
+
+    + __korelacja ujemna__ - informacja, że wzrostowi wartości jednej cechy towarzyszy spadek wartości drugiej cechy
+
+* Siła związku pomiędzy zmiennymi:
+
+    + od ___0___ do ___0.3___ - słaby związek
+
+    + od ___0.3___ do ___0.5___ - związek umiarkowanie silny
+
+    + od ___0.5___ do ___1___ - związek silny lub bardzo silny
+
+
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+ggcorrplot(res, hc.order= T, type= "lower", outline.color = "white", lab= T)
+```
+Odczytujemy z korelogramu interesującą nas zmienną - w naszym przypadku zmienna ___Quality___.  
+Możemy zauważyć że istotnie zmienna ___Quality___ skorelowana jest ze zmiennymi:
+
+* ___Alcohol___ (współczynnik korelacji równy ___0.44___)
+
+* ___Density___ (współczynnik korelacji równy ___-0.31___)
+
+Oznacza to że są to umiarkowanie silne powiązania pomiędzy tymi zmiennymi.
+
+
+### ___Zależność od rodzaju wina___
+
+Sprawdzimy, czy jakość wina zależy od jego rodzaju (koloru).  
+Tabelka, która ukazuje liczbę win o danej wartości jakości, z ograniczeniem na kolor wina:
+
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+freqcolordf <- data.frame(table(danewina$quality[danewina$color=="white"]),
+           table(factor(danewina$quality[danewina$color=="red"], levels=3:9)))
+
+freqcolordf <- freqcolordf[,c(2,4)]
+names(freqcolordf) <- c("white","red")
+rownames(freqcolordf) <- 3:9
+datatable(freqcolordf)
+```
+Sprawdzenie testem niezależności chi- kwadrat
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+chisq.test(unlist(danewina$quality[danewina$color=="red"]),unlist(danewina$quality[danewina$color=="red"]))
+```
+__Wniosek:__ Hipoteza zerowa: badane dane są niezależne.  
+Wartosc ___p___ jest bardzo mała, dlatego odrzucamy hipotezę zerową mówiącą że zmienne podlegające badaniu są niezależne i skłaniamy się ku hipotezie alternatywnej, mówiącej że są one zależne od siebie.  
+Wynik sugeruje że istnieje statystyczne powiązanie pomiędzy kolorem wina, a jego jakością (co możemy odczytać również bezpośrednio z tabelki - widzimy np. że wina białe dostały ocenę _9_ [prawie najwyższą], gdzie wina czerwone nie mogą się taką oceną pochwalić wcale).
+
+### ___Zależność od regionu pochodzenia___
+
+Sprawdzimy, czy jakość wina zależy od jego regionu.  
+Tabelki, które ukazują liczbę win o danej wartości jakości, oraz ich procentowy udział z ograniczeniem na 3 regiony:
+
+```{r, echo =T, results=T, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+qualCat <- as.data.frame(table(Catania_Wine$quality))
+qualBol <- as.data.frame(table(Bolonia_Wine$quality))
+qualEmiR <- as.data.frame(table(EmiliaRomana_Wine$quality))
+
+qualData <- qualCat
+qualData <- cbind(qualData, qualBol$Freq)
+qualData <- cbind(qualData, qualEmiR$Freq)
+
+row.names(qualData) <- qualData$Var1
+qualData <- qualData[,2:4]
+names(qualData) <- c("Catania","Bolonia","Emilia Romana")
+
+## Funkcja zamiany wartosci na procenty w zaleznosci od wierszy
+percentSumRows <- function(x){
+  
+  percentqualData <- data.frame(matrix(NA, ncol = ncol(x)))
+  
+  for (i in 1:nrow(x)){
+    percentqualData <- rbind(percentqualData, paste0(round(as.numeric(x[i,]/rowSums(x[i,]))*100,1),"%"))
+  }
+  
+  ## Wynik procentowy jakosci wina z podzialem na regiony
+  percentqualData <- percentqualData[2:8,]
+  row.names(percentqualData) <- row.names(x)
+  names(percentqualData) <- names(x)
+  return(percentqualData)
+}
+
+datatable(qualData)
+datatable(percentSumRows(qualData), options = list(
+            columnDefs = list(list(className = 'dt-right', targets = 1:3))
+            ))
+
+barplot(t(qualData[c("Catania", "Bolonia", "Emilia Romana")]),
+        beside= T, ylab= "Frequency", xlab= "Quality")
+grid()
+barplot(t(qualData[c("Catania", "Bolonia", "Emilia Romana")]),
+        beside= T, ylab= "Frequency", xlab= "Quality", add = T, 
+        col= c("deeppink","pink2", "pink4"))
+box()
+legend(x ="topright", legend = c("Catania","Bolonia", "Emilia Romana"),
+        title ="Region: ", box.lty = 2,
+        col= c("deeppink","pink2", "pink4"), lty=c(1,1,1),
+        lwd=3, cex=0.9, horiz=F, bty = "o")
+```
+__Wniosek:__ Możemy zauważyć że jakość wina zależy w pewnym stopniu od regionu pochodzenia.  
+Największy odsetek wszystkich ocen _9_ [czyli tych niemal najlepszych] stanowiły wina z regionu Bolonia.  
+Jednakże wśród win średnich [oceny _5_, czy _6_] przeważały wina pochodzące z regionu Catania.  
+Region Emilia Romana w tym zestawieniu wypada najgorzej - możemy zatem stwierdzić, że mało prawdopodobne jest trafienie na dobre wino z regionu Emilia Romana.
+
+***
+
+***
