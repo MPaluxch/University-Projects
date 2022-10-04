@@ -1,2 +1,2 @@
-# University-Projects-R
+# University-Projects
 Projects from university 
